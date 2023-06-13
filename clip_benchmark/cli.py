@@ -41,7 +41,7 @@ def get_parser_args():
     parser_eval.add_argument('--annotation_file', default="", type=str, help="text annotation file for retrieval datasets. Only needed  for when `--task` is `zeroshot_retrieval`.")
     parser_eval.add_argument('--language', default="en", type=str, nargs="+", help="language(s) of classname and prompts to use for zeroshot classification.")
     parser_eval.add_argument('--output_dir', default="output")
-    parser_eval.add_argument('--output', default="{output_dir}/{debugstr}{dataset}_{split}_{pretrained}_{pretrained_full_path}_{model}_{language}_{task}{templatestr}/result.json", type=str, help="output file where to dump the metrics. Can be in form of a template, e.g., --output='{dataset}_.....json'")
+    parser_eval.add_argument('--output', default="{output_dir}/{debugstr}{dataset}_{split}_{pretrained}_{model}_{language}_{task}{templatestr}/result.json", type=str, help="output file where to dump the metrics. Can be in form of a template, e.g., --output='{dataset}_.....json'") # {pretrained_full_path}_ not necessary
     parser_eval.add_argument('--quiet', dest='verbose', action="store_false", help="suppress verbose messages")
     parser_eval.add_argument('--cupl', default=False, action="store_true", help="Use natural language prompt from CuPL paper")
     parser_eval.add_argument('--save_clf', default=None, type=str, help="optionally save the classification layer output by the text tower")
@@ -170,7 +170,7 @@ def run(args):
         dataset=dataset_slug,
         split=args.split,
         language=args.language,
-        templatestr=f"-{args.template_override}" if args.template_override else "",
+        templatestr=f"-{args.template_override}" if args.template_override is not None else "",
     )
     if os.path.exists(output) and args.skip_existing:
         if args.verbose:
