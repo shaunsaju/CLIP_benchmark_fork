@@ -4,6 +4,8 @@ import sys
 import json
 from subprocess import call
 from collections import defaultdict
+from typing import Optional
+
 import torch
 from torchvision.datasets import (
     VisionDataset, ImageFolder,
@@ -12,7 +14,7 @@ from torchvision.datasets import (
     MNIST, STL10, EuroSAT, GTSRB, Kitti, Country211, PCAM, RenderedSST2
 )
 
-from . import voc2007, flickr, caltech101, imagenetv2, objectnet
+from . import voc2007, flickr, caltech101, imagenetv2, objectnet, caltech101vic
 from torch.utils.data import default_collate
 from PIL import Image
 
@@ -31,7 +33,7 @@ def _load_classnames_and_classification_templates(dataset_name, current_folder, 
     # default template to use when the dataset name does not belong to `zeroshot_classification_templates`
     DEFAULT_ZEROSHOT_CLASSIFICATION_TEMPLATES = zeroshot_classification_templates["imagenet1k"]
 
-    if dataset_name.startswith("tfds/") or dataset_name.startswith("vtab/") or dataset_name.startswith("wds/"):
+    if dataset_name.startswith("tfds/") or dataset_name.startswith("vtab/") or dataset_name.startswith("wds/") or dataset_name.startswith("vic/"):
         name = dataset_name.split("/")[-1]
     else:
         name = dataset_name
@@ -39,7 +41,8 @@ def _load_classnames_and_classification_templates(dataset_name, current_folder, 
 
     return classnames, templates
 
-def build_dataset(dataset_name, root="root", transform=None, split="test", download=True, annotation_file=None, language="en", task='zeroshot_classification', cupl=False, wds_cache_dir=None, **kwargs):
+def build_dataset(dataset_name, root="root", transform=None, split="test", download=True, annotation_file=None, language="en", task='zeroshot_classification', cupl=False, wds_cache_dir=None,
+                  small=0, template_override:Optional[str]=None, **kwargs):
     """
     Main function to use in order to build a dataset instance,
 
@@ -62,7 +65,10 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
     """
     current_folder = os.path.dirname(__file__)
     if task in ('zeroshot_classification', 'linear_probe'):  # Only load templates and classnames if we have to
-        classnames, templates = _load_classnames_and_classification_templates(dataset_name, current_folder, language)
+        template_name = template_override if template_override is not None else dataset_name
+        classnames, templates = _load_classnames_and_classification_templates(template_name, current_folder, language)
+        if template_override == "none":
+            templates = ["{c}"]
     else:
         classnames, templates = None, None
 
@@ -352,6 +358,11 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
         return ds
     elif dataset_name == "dummy":
         ds = Dummy()
+    elif dataset_name == "vic/caltech101":
+        # new version of caltech101 with new splits and faces_easy and background removed.
+        ds = caltech101vic.Caltech101Vic(
+            root=root, target_type="category", transform=transform, download=download,
+            split=split, **kwargs)
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}.")
 
@@ -360,7 +371,46 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
     else:
         ds.templates = templates
 
+    if small > 0:
+        if dataset_name not in ["imagenet1k", "caltech101", "vic/caltech101"]:
+            print(f"Small dataset must be implemented per dataset.")
+            breakpoint()
+            raise ValueError(f"Small dataset is only supported for imagenet1k and caltech101, not {dataset_name}")
+
+        orig_len = len(ds)
+        n_target = min(orig_len, 100)
+        # "randomly" sample 100 datapoints
+        old_settings = np.seterr(over='ignore')
+        new_ids = K64(np.arange(n_target)) % orig_len
+        np.seterr(**old_settings)
+        print(new_ids)
+        for field in ["imgs", "samples", "targets", "index", "y"]:
+            if not hasattr(ds, field):
+                continue
+
+            value = getattr(ds, field)
+            new_value = [value[i] for i in new_ids]
+            setattr(ds, field, new_value)
+        print(f"Reduced dataset size from {orig_len} to {len(ds)} for {type(ds).__name__}")
     return ds
+
+
+# determinstic "RNG" to generate smaller version of dataset
+# https://stackoverflow.com/questions/47678568/deterministic-pseudorandom-number-generation
+# note: use np.seterr(over='ignore')
+import numpy as np
+
+A = np.uint64(6364136223846793005) # multiplier
+C = np.uint64(1442695040888963407) # increment
+K = np.float64(5.421010862427522170037E-20) # 1/2^64
+
+def K64(seed):
+    """
+    Knuth 64bit MMIX LCG, return uint64 in the range [0...2^64)
+    """
+    return A*np.uint64(seed) + C
+
+
 
 class Dummy():
 

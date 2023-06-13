@@ -3,8 +3,11 @@ Code adapated from https://github.com/mlfoundations/open_clip/blob/main/src/trai
 Thanks to the authors of OpenCLIP
 """
 import logging
+import os
 from contextlib import suppress
+from pathlib import Path
 
+import joblib
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -12,7 +15,8 @@ from tqdm import tqdm
 from sklearn.metrics import classification_report, balanced_accuracy_score
 
 
-def zero_shot_classifier(model, tokenizer, classnames, templates, device, amp=True, cupl=False):
+def zero_shot_classifier(model, tokenizer, classnames, templates, device, amp=True, cupl=False,
+                         args_hash=None):
     """
     This function returns zero-shot vectors for each class in order
     to use it for zero-shot classification.
@@ -37,6 +41,17 @@ def zero_shot_classifier(model, tokenizer, classnames, templates, device, amp=Tr
     of templates, and C is the number of classes.
     """
     autocast = torch.cuda.amp.autocast if amp else suppress
+    # ##### change to autocache the classifier. could have used --load_clf instead.
+    zeroshot_weights_file = None
+    if args_hash is not None:
+        classnames_hash = joblib.hash(tuple(classnames))
+        templates_hash = joblib.hash(tuple(templates))
+        total_hash = "~".join((args_hash, classnames_hash, templates_hash))
+        zeroshot_weights_file = Path(f"cache/zeroshot_weights_{total_hash}.pth")
+        if zeroshot_weights_file.is_file():
+            logging.info(f"Loading zeroshot weights from {zeroshot_weights_file}")
+            return torch.load(zeroshot_weights_file, map_location="cpu").to(device)
+    # ##### end change
     with torch.no_grad(), autocast():
         zeroshot_weights = []
         for classname in tqdm(classnames):
@@ -50,6 +65,10 @@ def zero_shot_classifier(model, tokenizer, classnames, templates, device, amp=Tr
             class_embedding /= class_embedding.norm()
             zeroshot_weights.append(class_embedding)
         zeroshot_weights = torch.stack(zeroshot_weights, dim=1).to(device)
+    if zeroshot_weights_file is not None:
+        os.makedirs(zeroshot_weights_file.parent, exist_ok=True)
+        logging.info(f"Saving zeroshot weights to {zeroshot_weights_file}")
+        torch.save(zeroshot_weights.cpu(), zeroshot_weights_file)
     return zeroshot_weights
 
 
@@ -159,7 +178,8 @@ def average_precision_per_class(scores, targets):
     return ap
 
 
-def evaluate(model, dataloader, tokenizer, classnames, templates, device, amp=True, verbose=False, cupl=False, save_clf=None, load_clfs=[]):
+def evaluate(model, dataloader, tokenizer, classnames, templates, device, amp=True, verbose=False, cupl=False, save_clf=None, load_clfs=[],
+             args_hash=None):
     """
     Run zero-shot classification and evaluate the metrics
 
@@ -185,6 +205,8 @@ def evaluate(model, dataloader, tokenizer, classnames, templates, device, amp=Tr
 
     verbose: whether to use verbose model
 
+    args_hash: unique hash to identify the experiment, built by cli argparse args
+
     Returns
     -------
 
@@ -197,7 +219,8 @@ def evaluate(model, dataloader, tokenizer, classnames, templates, device, amp=Tr
             classifier = classifier + torch.load(load_clfs[i], map_location='cpu') / n
         classifier = classifier.to(device)
     else:
-        classifier = zero_shot_classifier(model, tokenizer, classnames, templates, device, cupl=cupl)
+        classifier = zero_shot_classifier(model, tokenizer, classnames, templates, device, cupl=cupl,
+                                          args_hash=args_hash)
     
     if save_clf is not None:
         torch.save(classifier, save_clf)
@@ -214,7 +237,7 @@ def evaluate(model, dataloader, tokenizer, classnames, templates, device, amp=Tr
         if verbose:
             for class_name, ap in zip(dataloader.dataset.classes, ap_per_class.tolist()):
                 print(f"Class: {class_name}, AveragePrecision: {ap}")
-        return {"mean_average_precision": ap_per_class.mean().item()}
+        metrics = {"mean_average_precision": ap_per_class.mean().item()}
     else:
         # Single label per image, multiple classes on the dataset
         # just compute accuracy and mean_per_class_recall
@@ -229,4 +252,5 @@ def evaluate(model, dataloader, tokenizer, classnames, templates, device, amp=Tr
         mean_per_class_recall = balanced_accuracy_score(target, pred)
         if verbose:
             print(classification_report(target, pred, digits=3))
-        return {"acc1": acc1, "acc5": acc5, "mean_per_class_recall": mean_per_class_recall}
+        metrics = {"acc1": acc1, "acc5": acc5, "mean_per_class_recall": mean_per_class_recall}
+    return metrics, logits, target

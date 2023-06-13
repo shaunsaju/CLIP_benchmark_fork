@@ -2,6 +2,10 @@
 import argparse
 import sys
 import json
+from pathlib import Path
+
+import joblib
+import numpy as np
 import torch
 import csv
 from copy import copy
@@ -36,7 +40,8 @@ def get_parser_args():
     parser_eval.add_argument('--feature_root', default="features", type=str, help="feature root folder where the features are stored.")
     parser_eval.add_argument('--annotation_file', default="", type=str, help="text annotation file for retrieval datasets. Only needed  for when `--task` is `zeroshot_retrieval`.")
     parser_eval.add_argument('--language', default="en", type=str, nargs="+", help="language(s) of classname and prompts to use for zeroshot classification.")
-    parser_eval.add_argument('--output', default="result.json", type=str, help="output file where to dump the metrics. Can be in form of a template, e.g., --output='{dataset}_{pretrained}_{model}_{language}_{task}.json'")
+    parser_eval.add_argument('--output_dir', default="output")
+    parser_eval.add_argument('--output', default="{output_dir}/{debugstr}{dataset}_{split}_{pretrained}_{pretrained_full_path}_{model}_{language}_{task}{templatestr}/result.json", type=str, help="output file where to dump the metrics. Can be in form of a template, e.g., --output='{dataset}_.....json'")
     parser_eval.add_argument('--quiet', dest='verbose', action="store_false", help="suppress verbose messages")
     parser_eval.add_argument('--cupl', default=False, action="store_true", help="Use natural language prompt from CuPL paper")
     parser_eval.add_argument('--save_clf', default=None, type=str, help="optionally save the classification layer output by the text tower")
@@ -44,6 +49,8 @@ def get_parser_args():
     parser_eval.add_argument('--skip_existing', default=False, action="store_true", help="whether to skip an evaluation if the output file exists.")
     parser_eval.add_argument('--model_type', default="open_clip", type=str, choices=MODEL_TYPES, help="clip model type")
     parser_eval.add_argument('--wds_cache_dir', default=None, type=str, help="optional cache directory for webdataset only")
+    parser_eval.add_argument('--small', type=int, default=0, help="Creater smaller version of dataset for testing")
+    parser_eval.add_argument('--template_override', type=str, default=None, help="Fix used template instead of using dataset name")
     parser_eval.set_defaults(which='eval')
 
     parser_build = subparsers.add_parser('build', help='Build CSV from evaluations')
@@ -154,12 +161,16 @@ def run(args):
     pretrained_slug_full_path = args.pretrained.replace('/', '_') if os.path.isfile(args.pretrained) else args.pretrained
     dataset_slug = dataset_name.replace('/', '_')
     output = args.output.format(
+        output_dir = args.output_dir,
+        debugstr=f"DEBUGmax{args.small}-" if args.small > 0 else "",
         model=args.model, 
         pretrained=pretrained_slug,
         pretrained_full_path=pretrained_slug_full_path,
         task=task, 
         dataset=dataset_slug,
-        language=args.language
+        split=args.split,
+        language=args.language,
+        templatestr=f"-{args.template_override}" if args.template_override else "",
     )
     if os.path.exists(output) and args.skip_existing:
         if args.verbose:
@@ -190,6 +201,8 @@ def run(args):
             task=task,
             cupl=args.cupl,
             wds_cache_dir=args.wds_cache_dir,
+            small=args.small,
+            template_override=args.template_override,
         )
         collate_fn = get_dataset_collate_fn(args.dataset)
         if args.verbose:
@@ -216,6 +229,14 @@ def run(args):
                 shuffle=False, num_workers=args.num_workers, 
                 collate_fn=collate_fn
             )
+
+    # create unique hash for this experiment
+    hash_list = []
+    for args_field in ["dataset", "language", "model", "model_type", "pretrained", "pretrained_model", "task", "which", "template_override"]:
+        hash_list.append(getattr(args, args_field))
+    args_hash = joblib.hash(hash_list)
+
+    logits, target = None, None
     if task == "zeroshot_classification":
         zeroshot_templates = dataset.templates if hasattr(dataset, "templates") else None
         if args.cupl:
@@ -224,7 +245,7 @@ def run(args):
             print(f"Zero-shot templates: {zeroshot_templates}")
         classnames = dataset.classes if hasattr(dataset, "classes") else None
         assert (zeroshot_templates is not None and classnames is not None), "Dataset does not support classification"
-        metrics = zeroshot_classification.evaluate(
+        metrics, logits, target = zeroshot_classification.evaluate(
             model, 
             dataloader, 
             tokenizer, 
@@ -235,6 +256,7 @@ def run(args):
             cupl=args.cupl,
             save_clf=args.save_clf,
             load_clfs=args.load_clfs,
+            args_hash=args_hash,
         )
     elif task == "zeroshot_retrieval":
         metrics = zeroshot_retrieval.evaluate(
@@ -254,6 +276,8 @@ def run(args):
             split='train', 
             annotation_file=args.annotation_file,
             download=True,
+            small=args.small,
+            template_override=args.template_override,
         )
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset, batch_size=args.batch_size, 
@@ -299,8 +323,20 @@ def run(args):
     }
     if args.verbose:
         print(f"Dump results to: {output}")
-    with open(output, "w") as f:
+    output_json = Path(output)
+    os.makedirs(output_json.parent, exist_ok=True)
+    with open(output_json, "w", encoding="utf-8") as f:
         json.dump(dump, f)
+    if logits is not None:
+        output_logits = output_json.parent / (output_json.stem + "_logits.pt")
+        torch.save(logits.cpu(), output_logits)
+        # possible improvements:
+        #   saving as half or 8bit could save space.
+        #   saving in e.g. h5 could be faster to access single datapoints.
+        #   save only top50 instead of all 1000 logits.
+    if target is not None:
+        output_target = output_json.parent / (output_json.stem + "_target.pt")
+        torch.save(target.cpu(), output_target)
     return 0
 
 
