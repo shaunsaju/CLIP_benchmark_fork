@@ -1,0 +1,9 @@
+# torch>=1.8.1,<2
+# torchvision>=0.8.9,<2
+tqdm
+scikit-learn
+open_clip_torch
+pycocoevalcap
+webdataset
+transformers
+
