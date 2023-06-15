@@ -177,7 +177,7 @@ def run(args):
             print(f"Skip {output}, exists already.")
         return
     if args.verbose:
-        print(f"Running '{task}' on '{dataset_name}' with the model '{args.pretrained}' on language '{args.language}'")
+        print(f"Running '{task}' on '{dataset_name}' split {args.split} with the model '{args.pretrained}' on language '{args.language}'")
     dataset_root = args.dataset_root.format(dataset=dataset_name, dataset_cleaned=dataset_name.replace("/", "-"))
     if args.skip_load:
         model, transform, collate_fn, dataloader = None, None, None, None

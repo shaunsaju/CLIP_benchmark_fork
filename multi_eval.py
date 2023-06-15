@@ -1,3 +1,8 @@
+"""
+# to discard >24G requirement models
+python multi_eval.py -m "EVA02-E.*" -i
+
+"""
 import os
 from pprint import pprint
 
@@ -21,6 +26,7 @@ class Args(VerboseQuietArgs):
         shortcut="-s", type=str, help="Dataset split", default="train")
     model_regex: str = add_argument(
         shortcut="-m", type=str, help="Model regex", default="")
+
     invert_regex: bool = add_argument(
         shortcut="-i", action="store_true", help="Invert regex.")
     batch_size: int = add_argument(
