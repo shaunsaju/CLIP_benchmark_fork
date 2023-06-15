@@ -6,4 +6,4 @@ open_clip_torch
 pycocoevalcap
 webdataset
 transformers
-
+typedparser
