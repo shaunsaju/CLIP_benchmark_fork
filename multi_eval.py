@@ -34,7 +34,7 @@ def main():
     logger.info(args)
 
     root = os.environ["CV_DATA_DIR"]
-    assert os.path.exists(root), f"root={root} does not exist!"
+    os.makedirs(root, exist_ok=True)
     dataset = args.dataset
     split = args.split
     task = "zeroshot_classification"
