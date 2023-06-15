@@ -23,6 +23,8 @@ class Args(VerboseQuietArgs):
         shortcut="-m", type=str, help="Model regex", default="")
     invert_regex: bool = add_argument(
         shortcut="-i", action="store_true", help="Invert regex.")
+    batch_size: int = add_argument(
+        shortcut="-b", type=int, help="Batch size", default=64)
 
 
 def main():
@@ -63,9 +65,7 @@ def main():
 
         for template_override in ["none", "imagenet1k", "caltech101"]:
             templatestr = f"-{template_override}" if template_override is not None else ""
-            batch_size = 64  # default
-            if model.startswith("EVA02-E"):
-                batch_size = 1  # model too big
+            batch_size = args.batch_size
             actual_json = target_json.format(
                 output_dir=output_dir,
                 debugstr=debugstr,
