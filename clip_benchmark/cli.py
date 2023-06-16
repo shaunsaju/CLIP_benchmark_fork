@@ -1,8 +1,10 @@
 """Console script for clip_benchmark."""
 import argparse
+import glob
 import sys
 import json
 from pathlib import Path
+from pprint import pprint
 
 import joblib
 import numpy as np
@@ -41,7 +43,7 @@ def get_parser_args():
     parser_eval.add_argument('--annotation_file', default="", type=str, help="text annotation file for retrieval datasets. Only needed  for when `--task` is `zeroshot_retrieval`.")
     parser_eval.add_argument('--language', default="en", type=str, nargs="+", help="language(s) of classname and prompts to use for zeroshot classification.")
     parser_eval.add_argument('--output_dir', default="output")
-    parser_eval.add_argument('--output', default="{output_dir}/{debugstr}{dataset}_{split}_{pretrained}_{model}_{language}_{task}{templatestr}/result.json", type=str, help="output file where to dump the metrics. Can be in form of a template, e.g., --output='{dataset}_.....json'") # {pretrained_full_path}_ not necessary
+    parser_eval.add_argument('--output', default="{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}{templatestr}/result.json", type=str, help="output file where to dump the metrics. Can be in form of a template, e.g., --output='{dataset}_.....json'") # {pretrained_full_path}_ not necessary
     parser_eval.add_argument('--quiet', dest='verbose', action="store_false", help="suppress verbose messages")
     parser_eval.add_argument('--cupl', default=False, action="store_true", help="Use natural language prompt from CuPL paper")
     parser_eval.add_argument('--save_clf', default=None, type=str, help="optionally save the classification layer output by the text tower")
@@ -56,16 +58,33 @@ def get_parser_args():
     parser_build = subparsers.add_parser('build', help='Build CSV from evaluations')
     parser_build.add_argument('files', type=str,  nargs="+", help="path(s) of JSON result files")
     parser_build.add_argument('--output', type=str,  default="benchmark.csv", help="CSV output file")
+    parser_build.add_argument("-t", "--test", action="store_true", help="Test mode (no write)")
     parser_build.set_defaults(which='build')
 
+    parser_build = subparsers.add_parser('globbuild', help='Search and build CSV from evaluations')
+    parser_build.add_argument('glob', type=str,  help="Glob path(s) of JSON result files")
+    parser_build.add_argument('--output', type=str,  default="benchmark.csv", help="CSV output file")
+    parser_build.add_argument("-t", "--test", action="store_true", help="Test mode (no write)")
+    parser_build.set_defaults(which='globbuild')
+
     args = parser.parse_args()
-    return args
+    return args, parser
 
 def main():
-    base = get_parser_args()
+    base, parser = get_parser_args()
+    if "which" not in base:
+        parser.print_help()
+        sys.exit(1)
     if base.which == "eval":
         main_eval(base)
     elif base.which == "build":
+        main_build(base)
+    elif base.which == "globbuild":
+        base.files = sorted(list(glob.glob(base.glob, recursive=True)))
+        if len(base.files) == 0:
+            print(f"No files found for {base.glob}")
+            sys.exit(1)
+        pprint(base.files)
         main_build(base)
 
 def main_build(base):
@@ -73,17 +92,45 @@ def main_build(base):
     rows = []
     fieldnames = set()
     for path in base.files:
-        data = json.load(open(path))
+        data = json.load(open(path, "r", encoding="utf-8"))
         row = {}
         row.update(data["metrics"])
         row.update(data)
         del row["metrics"]
-        row['model_fullname'] = row['model'] + ' ' + row['pretrained']
+        # row['model_fullname'] = row['model'] + ' ' + row['pretrained']  # not necessary
+
+        # missing information: split, prompt
+        # vic_caltech101~val~yfcc15m~RN50-quickgelu~en~zeroshot_classification~none
+        dataset, split, pretrained, model, language, task, template = Path(path).parent.as_posix().split("~")
+        row["split"] = split
+        row["template"] = template
+
+        # load model size from file
+        size_file = Path(f"model_sizes/{model}~{pretrained}.json")
+        params_g = json.load(size_file.open("r", encoding="utf-8"))["params_g"]
+        row["gigaparams"] = params_g
+
+        # dict_keys(['acc1', 'acc5', 'mean_per_class_recall', 'dataset', 'model', 'pretrained', 'task', 'language'])
         for field in row.keys():
             fieldnames.add(field)
         rows.append(row)
+    if base.test:
+        pprint(rows)
+        print(f"Not writing to {base.output} in test mode")
+        return
+    print(f"Writing to {base.output}")
+
+    # properly sort field names
+    sorted_fieldnames = []
+    sort_order = ["language", "task", "dataset", "split", "pretrained", "model", "gigaparams", "template"]
+    for field in sort_order:
+        sorted_fieldnames.append(field)
+        fieldnames.remove(field)
+    for remaining_field in sorted(fieldnames):
+        sorted_fieldnames.append(remaining_field)
+
     with open(base.output, 'w') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer = csv.DictWriter(csvfile, fieldnames=sorted_fieldnames)
         writer.writeheader()
         for row in rows:
             writer.writerow(row)

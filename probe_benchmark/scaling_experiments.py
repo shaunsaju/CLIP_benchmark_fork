@@ -61,7 +61,7 @@ if __name__ == '__main__':
                 continue
               for lr in lrs:
                 for bs in batch_sizes:
-                  args = get_parser_args()
+                  args, parser = get_parser_args()
                   args.dataset_root = dataset_root
                   args.dataset = dataset
                   args.task = 'linear_probe'

@@ -4,11 +4,10 @@ python multi_eval.py -m "EVA02-E.*" -i
 
 """
 import os
+from pathlib import Path
 from pprint import pprint
 
 import open_clip
-
-pprint(open_clip.pretrained.list_pretrained())
 
 from attr import define
 from typedparser import VerboseQuietArgs, add_argument, TypedParser
@@ -37,6 +36,7 @@ def main():
     parser = TypedParser.create_parser(Args, description=__doc__)
     args: Args = parser.parse_args()
     configure_logger(level=get_logger_level_from_args(args), format=SHORTEST_FORMAT)
+    logger.debug(open_clip.pretrained.list_pretrained())
     logger.info(args)
 
     root = os.environ["CV_DATA_DIR"]
@@ -48,7 +48,7 @@ def main():
     output_dir = "output"
     debugstr = ""
     dataset_slug = dataset.replace('/', '_')
-    target_json = "{output_dir}/{debugstr}{dataset}_{split}_{pretrained}_{model}_{language}_{task}{templatestr}/result.json"
+    target_json_new = "{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}{templatestr}/result.json"
 
     model_re = None
     if args.model_regex != "":
@@ -70,9 +70,10 @@ def main():
                 print(f"Regex PASS:   {model} {pretrained}")
 
         for template_override in ["none", "imagenet1k", "caltech101"]:
-            templatestr = f"-{template_override}" if template_override is not None else ""
             batch_size = args.batch_size
-            actual_json = target_json.format(
+
+            templatestrnew = f"~{template_override}" if template_override is not None else ""
+            actual_json = target_json_new.format(
                 output_dir=output_dir,
                 debugstr=debugstr,
                 dataset=dataset_slug,
@@ -81,8 +82,9 @@ def main():
                 model=model,
                 language=language,
                 task=task,
-                templatestr=templatestr,
+                templatestr=templatestrnew,
             )
+
             # print(f"Check for {actual_json}")
             if os.path.exists(actual_json):
                 # print(f"Skipping {actual_json} since it already exists!")
