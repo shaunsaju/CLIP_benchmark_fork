@@ -11,7 +11,7 @@ import open_clip
 
 from attr import define
 from typedparser import VerboseQuietArgs, add_argument, TypedParser
-from typedattr.logutils import SHORTEST_FORMAT, configure_logger, get_logger_level_from_args
+from packg.log import SHORTEST_FORMAT, configure_logger, get_logger_level_from_args
 from loguru import logger
 import re
 
@@ -54,7 +54,15 @@ def main():
     if args.model_regex != "":
         model_re = re.compile(args.model_regex)
 
-    for model, pretrained in open_clip.pretrained.list_pretrained():
+    model_list = open_clip.pretrained.list_pretrained()
+    model_list = [
+        ("ViT-L-14", "openai"),
+        ("EVA02-L-14-336", "merged2b_s6b_b61k"),
+        ("EVA02-L-14-336", "merged2b_s6b_b61k"),
+        ("EVA02-E-14-plus", "laion2b_s9b_b144k"),
+    ]
+
+    for model, pretrained in model_list:
         # for model, pretrained in [
         #     ("ViT-bigG-14", "laion2b_s39b_b160k"),
         #     ("ViT-L-14", "openai"),

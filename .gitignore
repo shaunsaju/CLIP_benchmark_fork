@@ -1,6 +1,6 @@
 .idea/
 cache/
-output/
+*output*/
 saved_benchmarks/
 
 # Byte-compiled / optimized / DLL files

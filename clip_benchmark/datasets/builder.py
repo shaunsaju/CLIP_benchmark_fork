@@ -2,6 +2,7 @@ import os
 import warnings
 import sys
 import json
+from pathlib import Path
 from subprocess import call
 from collections import defaultdict
 from typing import Optional
@@ -17,6 +18,9 @@ from torchvision.datasets import (
 from . import voc2007, flickr, caltech101, imagenetv2, objectnet, caltech101vic
 from torch.utils.data import default_collate
 from PIL import Image
+
+from .imagenet_cropped import ImageNetCropped
+
 
 def _load_classnames_and_classification_templates(dataset_name, current_folder, language):
     with open(os.path.join(current_folder, language + "_classnames.json"), "r") as f:
@@ -84,10 +88,25 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
     elif dataset_name == "imagenet1k":
         if not os.path.exists(root):
             os.makedirs(root, exist_ok=True)
-            call(f"wget https://image-net.org/data/ILSVRC/2012/ILSVRC2012_devkit_t12.tar.gz --output-document={root}/ILSVRC2012_devkit_t12.tar.gz", shell=True)            
-            call(f"wget https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar --output-document={root}/ILSVRC2012_img_val.tar", shell=True)            
+            call(
+                f"wget https://image-net.org/data/ILSVRC/2012/ILSVRC2012_devkit_t12.tar.gz --output-document={root}/ILSVRC2012_devkit_t12.tar.gz",
+                shell=True)
+            call(
+                f"wget https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar --output-document={root}/ILSVRC2012_img_val.tar",
+                shell=True)
 
-        ds =  ImageNet(root=root, split="train" if train else "val", transform=transform, **kwargs)
+        ds = ImageNet(root=root, split="train" if train else "val", transform=transform, **kwargs)
+        # use classnames from OpenAI
+        ds.classes = classnames["imagenet1k"]
+        templates_cupl = cupl_prompts["imagenet1k"]
+    elif dataset_name == "imagenet1kcropped":
+        root = (Path(root).parent / Path(root).name.replace("imagenet1kcropped", "imagenet1k")).as_posix()
+        print(f"Updated root: {root}")
+        if not os.path.exists(root):
+            os.makedirs(root, exist_ok=True)
+            call(f"wget https://image-net.org/data/ILSVRC/2012/ILSVRC2012_devkit_t12.tar.gz --output-document={root}/ILSVRC2012_devkit_t12.tar.gz", shell=True)
+
+        ds = ImageNetCropped(root=root, split="train" if train else "val", transform=transform, **kwargs)
         # use classnames from OpenAI
         ds.classes = classnames["imagenet1k"]
         templates_cupl = cupl_prompts["imagenet1k"]

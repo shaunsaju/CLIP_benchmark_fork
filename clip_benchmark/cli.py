@@ -23,7 +23,7 @@ def get_parser_args():
     
     parser_eval = subparsers.add_parser('eval', help='Evaluate')
     parser_eval.add_argument('--dataset', type=str, default="cifar10", nargs="+", help="Dataset(s) to use for the benchmark. Can be the name of a dataset, or a collection name ('vtab', 'vtab+', 'imagenet_robustness', 'retrieval') or path of a text file where each line is a dataset name")
-    parser_eval.add_argument('--dataset_root', default="root", type=str, help="dataset root folder where the datasets are downloaded. Can be in the form of a template depending on dataset name, e.g., --dataset_root='datasets/{dataset}'. This is useful if you evaluate on multiple datasets.")
+    parser_eval.add_argument('--dataset_root', default=None, type=str, help="dataset root folder where the datasets are downloaded. Can be in the form of a template depending on dataset name, e.g., --dataset_root='datasets/{dataset}'. This is useful if you evaluate on multiple datasets.")
     parser_eval.add_argument('--split', type=str, default="test", help="Dataset split to use")
     parser_eval.add_argument('--model', type=str, default="ViT-B-32-quickgelu", help="Model architecture to use from OpenCLIP")
     parser_eval.add_argument('--pretrained', type=str, default="laion400m_e32", help="Model checkpoint name to use from OpenCLIP")
@@ -217,7 +217,7 @@ def run(args):
         dataset=dataset_slug,
         split=args.split,
         language=args.language,
-        templatestr=f"-{args.template_override}" if args.template_override is not None else "",
+        templatestr=f"~{args.template_override}" if args.template_override is not None else "",
     )
     if os.path.exists(output) and args.skip_existing:
         if args.verbose:
@@ -225,7 +225,16 @@ def run(args):
         return
     if args.verbose:
         print(f"Running '{task}' on '{dataset_name}' split {args.split} with the model '{args.pretrained}' on language '{args.language}'")
-    dataset_root = args.dataset_root.format(dataset=dataset_name, dataset_cleaned=dataset_name.replace("/", "-"))
+
+    dataset_root = args.dataset_root
+    if dataset_root is None:
+        if "CV_DATA_DIR" not in os.environ:
+            raise ValueError("Either set envvar CV_DATA_DIR to the root of the dataset folder "
+                             "or pass --dataset_root")
+        dataset_root = (Path(os.environ["CV_DATA_DIR"]) / "clip_benchmark/{dataset_cleaned}").as_posix()
+    dataset_root = dataset_root.format(dataset=dataset_name,
+                                       dataset_cleaned=dataset_name.replace("/", "-"))
+    print(f"Dataset root: {dataset_root}")
     if args.skip_load:
         model, transform, collate_fn, dataloader = None, None, None, None
     else:
