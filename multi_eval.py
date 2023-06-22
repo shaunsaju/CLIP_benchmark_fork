@@ -98,7 +98,7 @@ def main():
 
                     # print(f"Check for {actual_json}")
                     if os.path.exists(actual_json):
-                        # print(f"Skipping {actual_json} since it already exists!")
+                        print(f"SKIP {actual_json}")
                         continue
                     else:
                         pass

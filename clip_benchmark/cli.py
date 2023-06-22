@@ -21,8 +21,8 @@ from clip_benchmark.metrics import zeroshot_classification, zeroshot_retrieval, 
 from clip_benchmark.model_collection import get_model_collection_from_file, model_collection
 from clip_benchmark.models import load_clip, MODEL_TYPES
 
-TARGET_JSON = "{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}~{template}~{transform}/result.json"
 
+TARGET_JSON="{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}~{template}~{transform}/result.json"
 
 def get_parser_args():
     parser = argparse.ArgumentParser()
