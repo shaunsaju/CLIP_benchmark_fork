@@ -21,8 +21,8 @@ from clip_benchmark.metrics import zeroshot_classification, zeroshot_retrieval, 
 from clip_benchmark.model_collection import get_model_collection_from_file, model_collection
 from clip_benchmark.models import load_clip, MODEL_TYPES
 
+TARGET_JSON = "{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}~{template}~{transform}/result.json"
 
-TARGET_JSON="{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}~{template}~{transform}/result.json"
 
 def get_parser_args():
     parser = argparse.ArgumentParser()
@@ -80,7 +80,7 @@ def get_parser_args():
                              help="optionally load and average mutliple layers output by text towers.")
     parser_eval.add_argument('--skip_existing', default=False, action="store_true",
                              help="whether to skip an evaluation if the output file exists.")
-    parser_eval.add_argument('--model_type', default="open_clip", type=str, choices=MODEL_TYPES,tra
+    parser_eval.add_argument('--model_type', default="open_clip", type=str, choices=MODEL_TYPES,
                              help="clip model type")
     parser_eval.add_argument('--wds_cache_dir', default=None, type=str,
                              help="optional cache directory for webdataset only")
