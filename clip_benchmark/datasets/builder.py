@@ -85,6 +85,12 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
         ds = CIFAR10(root=root, train=train, transform=transform, download=download, **kwargs)
     elif dataset_name == "cifar100":
         ds = CIFAR100(root=root, train=train, transform=transform, download=download, **kwargs)
+    elif dataset_name == "imagenet1k-unverified":
+        split = "train" if train else "val"
+        ds =  ImageFolder(root=os.path.join(root, split), transform=transform, **kwargs)
+        # use classnames from OpenAI
+        ds.classes = classnames["imagenet1k"]
+        templates_cupl = cupl_prompts["imagenet1k"]
     elif dataset_name == "imagenet1k":
         if not os.path.exists(root):
             os.makedirs(root, exist_ok=True)
@@ -99,20 +105,13 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
         # use classnames from OpenAI
         ds.classes = classnames["imagenet1k"]
         templates_cupl = cupl_prompts["imagenet1k"]
-    elif dataset_name == "imagenet1kcropped":
-        root = (Path(root).parent / Path(root).name.replace("imagenet1kcropped", "imagenet1k")).as_posix()
+    elif dataset_name.startswith("imagenet1k-"):
+        subfolder = dataset_name[len("imagenet1k-"):]
+        root = (Path(root).parent / Path(root).name.replace(dataset_name, "imagenet1k")).as_posix()
         print(f"Updated root: {root}")
-        if not os.path.exists(root):
-            os.makedirs(root, exist_ok=True)
-            call(f"wget https://image-net.org/data/ILSVRC/2012/ILSVRC2012_devkit_t12.tar.gz --output-document={root}/ILSVRC2012_devkit_t12.tar.gz", shell=True)
-
-        ds = ImageNetCropped(root=root, split="train" if train else "val", transform=transform, **kwargs)
-        # use classnames from OpenAI
-        ds.classes = classnames["imagenet1k"]
-        templates_cupl = cupl_prompts["imagenet1k"]
-    elif dataset_name == "imagenet1k-unverified":
-        split = "train" if train else "val"
-        ds =  ImageFolder(root=os.path.join(root, split), transform=transform, **kwargs)
+        assert os.path.exists(root), f"Path missing: {root}. Run normal imagenet1k first."
+        ds = ImageNetCropped(root=root, split="train" if train else "val", transform=transform,
+                             subfolder=subfolder, **kwargs)
         # use classnames from OpenAI
         ds.classes = classnames["imagenet1k"]
         templates_cupl = cupl_prompts["imagenet1k"]
