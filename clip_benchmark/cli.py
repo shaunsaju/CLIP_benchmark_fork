@@ -22,6 +22,8 @@ from clip_benchmark.model_collection import get_model_collection_from_file, mode
 from clip_benchmark.models import load_clip, MODEL_TYPES
 
 
+TARGET_JSON="{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}~{template}~{transform}/result.json"
+
 def get_parser_args():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
@@ -66,9 +68,7 @@ def get_parser_args():
     parser_eval.add_argument('--language', default="en", type=str, nargs="+",
                              help="language(s) of classname and prompts to use for zeroshot classification.")
     parser_eval.add_argument('--output_dir', default="output")
-    parser_eval.add_argument('--output',
-                             default="{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}~{template}~{transform}/result.json",
-                             type=str,
+    parser_eval.add_argument('--output', default=TARGET_JSON, type=str,
                              help="output file where to dump the metrics. Can be in form of a template, e.g., --output='{dataset}_.....json'")  # {pretrained_full_path}_ not necessary
     parser_eval.add_argument('--quiet', dest='verbose', action="store_false",
                              help="suppress verbose messages")
@@ -80,7 +80,7 @@ def get_parser_args():
                              help="optionally load and average mutliple layers output by text towers.")
     parser_eval.add_argument('--skip_existing', default=False, action="store_true",
                              help="whether to skip an evaluation if the output file exists.")
-    parser_eval.add_argument('--model_type', default="open_clip", type=str, choices=MODEL_TYPES,
+    parser_eval.add_argument('--model_type', default="open_clip", type=str, choices=MODEL_TYPES,tra
                              help="clip model type")
     parser_eval.add_argument('--wds_cache_dir', default=None, type=str,
                              help="optional cache directory for webdataset only")
@@ -256,12 +256,12 @@ def run(args):
     output = args.output.format(
         output_dir=args.output_dir,
         debugstr=f"DEBUGmax{args.small}-" if args.small > 0 else "",
-        model=args.model,
-        pretrained=pretrained_slug,
-        pretrained_full_path=pretrained_slug_full_path,
-        task=task,
         dataset=dataset_slug,
         split=args.split,
+        pretrained=pretrained_slug,
+        pretrained_full_path=pretrained_slug_full_path,
+        model=args.model,
+        task=task,
         language=args.language,
         template=args.template,
         transform=args.transform,
