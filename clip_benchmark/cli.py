@@ -10,8 +10,12 @@ import joblib
 import numpy as np
 import torch
 import csv
-from copy import copy
+from copy import copy, deepcopy
 import os
+
+import torchvision
+from torchvision.transforms import InterpolationMode
+
 from clip_benchmark.datasets.builder import build_dataset, get_dataset_collate_fn, get_dataset_default_task, dataset_collection, get_dataset_collection_from_file
 from clip_benchmark.metrics import zeroshot_classification, zeroshot_retrieval, linear_probe, mscoco_generative
 from clip_benchmark.model_collection import get_model_collection_from_file, model_collection
@@ -53,6 +57,7 @@ def get_parser_args():
     parser_eval.add_argument('--wds_cache_dir', default=None, type=str, help="optional cache directory for webdataset only")
     parser_eval.add_argument('--small', type=int, default=0, help="Creater smaller version of dataset for testing")
     parser_eval.add_argument('--template_override', type=str, default=None, help="Fix used template instead of using dataset name")
+    parser_eval.add_argument('--custom_transform', type=str, default=None, help="Custom transform")
     parser_eval.set_defaults(which='eval')
 
     parser_build = subparsers.add_parser('build', help='Build CSV from evaluations')
@@ -246,6 +251,43 @@ def run(args):
             device=args.device
         )
         model.eval()
+
+        if args.custom_transform is not None:
+            # assuming its a compose of 5 transforms
+
+            # default: ratio-preserving resize shorter side to 224, then centercrop
+            assert isinstance(transform, torchvision.transforms.Compose)
+            old_transforms = transform.transforms
+            assert len(old_transforms) == 5
+            assert isinstance(old_transforms[0], torchvision.transforms.Resize)
+            size = old_transforms[0].size
+            assert isinstance(size, int)
+            assert isinstance(old_transforms[1], torchvision.transforms.CenterCrop)
+
+            if args.custom_transform == "resizeonly":
+                # ignore ratio-preserving and just resize to 224x224
+                new_transforms = [
+                    torchvision.transforms.Resize(
+                        (size, size),interpolation=InterpolationMode.BICUBIC),
+                ]
+            elif args.custom_transform == "zeropad":
+                # ratio-preserving size longer side to 224, then zeropad by using centercrop
+                new_transforms = [
+                    torchvision.transforms.Resize(
+                        size-1, max_size=size, interpolation=InterpolationMode.BICUBIC),
+                    torchvision.transforms.CenterCrop(
+                        (size, size)),
+                ]
+            else:
+                raise ValueError(f"Unknown custom transform {args.custom_transform}")
+            new_transform = torchvision.transforms.Compose([
+                *new_transforms,
+                *[deepcopy(x) for x in old_transforms[2:]],
+            ])
+            print(f"Replacing transform {transform} with {new_transform}")
+            transform = new_transform
+
+
         dataset = build_dataset(
             dataset_name=args.dataset, 
             root=dataset_root, 
