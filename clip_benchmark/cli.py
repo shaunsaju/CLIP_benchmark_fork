@@ -1,17 +1,19 @@
 """Console script for clip_benchmark."""
 import argparse
+import csv
 import glob
-import sys
 import json
+import os
+import sys
+from copy import copy, deepcopy
 from pathlib import Path
 from pprint import pprint
 
 import joblib
-import numpy as np
 import torch
-import csv
-from copy import copy
-import os
+import torchvision
+from torchvision.transforms import InterpolationMode
+
 from clip_benchmark.datasets.builder import build_dataset, get_dataset_collate_fn,\
     get_dataset_default_task, dataset_collection, get_dataset_collection_from_file
 from clip_benchmark.metrics import zeroshot_classification, zeroshot_retrieval, linear_probe,\
@@ -278,7 +280,7 @@ def run(args):
             raise ValueError("Either set envvar CV_DATA_DIR to the root of the dataset folder "
                              "or pass --dataset_root")
         dataset_root = (
-                    Path(os.environ["CV_DATA_DIR"]) / "clip_benchmark/{dataset_cleaned}").as_posix()
+                Path(os.environ["CV_DATA_DIR"]) / "clip_benchmark/{dataset_cleaned}").as_posix()
     dataset_root = dataset_root.format(dataset=dataset_name,
                                        dataset_cleaned=dataset_name.replace("/", "-"))
     print(f"Dataset root: {dataset_root}")
@@ -293,6 +295,42 @@ def run(args):
             device=args.device
         )
         model.eval()
+
+        if args.transform != "default":
+            # assuming its a compose of 5 transforms
+
+            # default: ratio-preserving resize shorter side to 224, then centercrop
+            assert isinstance(transform, torchvision.transforms.Compose)
+            old_transforms = transform.transforms
+            assert len(old_transforms) == 5
+            assert isinstance(old_transforms[0], torchvision.transforms.Resize)
+            size = old_transforms[0].size
+            assert isinstance(size, int)
+            assert isinstance(old_transforms[1], torchvision.transforms.CenterCrop)
+
+            if args.transform == "resizeonly":
+                # ignore ratio-preserving and just resize to 224x224
+                new_transforms = [
+                    torchvision.transforms.Resize(
+                        (size, size), interpolation=InterpolationMode.BICUBIC),
+                ]
+            elif args.transform == "zeropad":
+                # ratio-preserving size longer side to 224, then zeropad by using centercrop
+                new_transforms = [
+                    torchvision.transforms.Resize(
+                        size - 1, max_size=size, interpolation=InterpolationMode.BICUBIC),
+                    torchvision.transforms.CenterCrop(
+                        (size, size)),
+                ]
+            else:
+                raise ValueError(f"Unknown custom transform {args.transform}")
+            new_transform = torchvision.transforms.Compose([
+                *new_transforms,
+                *[deepcopy(x) for x in old_transforms[2:]],
+            ])
+            print(f"Replacing transform {transform} with {new_transform}")
+            transform = new_transform
+
         dataset = build_dataset(
             dataset_name=args.dataset,
             root=dataset_root,
@@ -305,7 +343,7 @@ def run(args):
             cupl=args.cupl,
             wds_cache_dir=args.wds_cache_dir,
             small=args.small,
-            template_override=args.template_override,
+            template=args.template,
         )
         collate_fn = get_dataset_collate_fn(args.dataset)
         if args.verbose:
@@ -336,7 +374,7 @@ def run(args):
     # create unique hash for this experiment
     hash_list = []
     for args_field in ["dataset", "language", "model", "model_type", "pretrained",
-                       "pretrained_model", "task", "which", "template_override"]:
+                       "pretrained_model", "task", "which", "template"]:
         hash_list.append(getattr(args, args_field))
     args_hash = joblib.hash(hash_list)
 
@@ -349,7 +387,7 @@ def run(args):
             print(f"Zero-shot templates: {zeroshot_templates}")
         classnames = dataset.classes if hasattr(dataset, "classes") else None
         assert (
-                    zeroshot_templates is not None and classnames is not None), "Dataset does not support classification"
+                zeroshot_templates is not None and classnames is not None), "Dataset does not support classification"
         metrics, logits, target = zeroshot_classification.evaluate(
             model,
             dataloader,
@@ -382,7 +420,7 @@ def run(args):
             annotation_file=args.annotation_file,
             download=True,
             small=args.small,
-            template_override=args.template_override,
+            template=args.template,
         )
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset, batch_size=args.batch_size,

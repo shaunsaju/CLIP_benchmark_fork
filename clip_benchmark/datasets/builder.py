@@ -46,7 +46,7 @@ def _load_classnames_and_classification_templates(dataset_name, current_folder, 
     return classnames, templates
 
 def build_dataset(dataset_name, root="root", transform=None, split="test", download=True, annotation_file=None, language="en", task='zeroshot_classification', cupl=False, wds_cache_dir=None,
-                  small=0, template_override:Optional[str]=None, **kwargs):
+                  small=0, template:str="auto", **kwargs):
     """
     Main function to use in order to build a dataset instance,
 
@@ -69,9 +69,9 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
     """
     current_folder = os.path.dirname(__file__)
     if task in ('zeroshot_classification', 'linear_probe'):  # Only load templates and classnames if we have to
-        template_name = template_override if template_override is not None else dataset_name
+        template_name = template if template != "auto" else dataset_name
         classnames, templates = _load_classnames_and_classification_templates(template_name, current_folder, language)
-        if template_override == "none":
+        if template == "none":
             templates = ["{c}"]
     else:
         classnames, templates = None, None
@@ -220,7 +220,7 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
         from clip_benchmark.datasets import multilingual_mscoco
         if(language not in multilingual_mscoco.SUPPORTED_LANGUAGES):
             raise ValueError("Unsupported language for multilingual_ms_coco:", language)
-        
+
         def get_archive_name(target_split):
             if target_split == "train":
                 return "train2014.zip"
@@ -538,8 +538,8 @@ def build_vtab_dataset(dataset_name, transform, download=True, split="test", dat
         from .kitti import KittiData
         task = _extract_task(dataset_name)
         assert task in (
-            "count_all", "count_left", "count_far", "count_near", 
-            "closest_object_distance", "closest_object_x_location", 
+            "count_all", "count_left", "count_far", "count_near",
+            "closest_object_distance", "closest_object_x_location",
             "count_vehicles", "closest_vehicle_distance",
         )
         tfds_dataset = KittiData(task=task, data_dir=data_dir)
@@ -586,9 +586,9 @@ def build_vtab_dataset(dataset_name, transform, download=True, split="test", dat
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
     ds =  VTABIterableDataset(
-        tfds_dataset, 
-        input_name="image", label_name="label", 
-        transform=transform, 
+        tfds_dataset,
+        input_name="image", label_name="label",
+        transform=transform,
         target_transform=int,
         split=split,
         classes=classes,
