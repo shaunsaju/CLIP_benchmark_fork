@@ -21,7 +21,7 @@ from clip_benchmark.cli import TARGET_JSON
 @define
 class Args(VerboseQuietArgs):
     test: bool = add_argument(shortcut="-t", action="store_true", help="Test only.")
-    dataset: str = add_argument(
+    datasets: str = add_argument(
         shortcut="-d", type=str, help="Dataset name", default="vic/caltech101")
     split: str = add_argument(
         shortcut="-s", type=str, help="Dataset split", default="train")
@@ -43,7 +43,7 @@ def main():
 
     root = os.environ["CV_DATA_DIR"]
     os.makedirs(root, exist_ok=True)
-    datasets = args.dataset.split(",")
+    datasets = args.datasets.split(",")
     split = args.split
     task = "zeroshot_classification"
     language = "en"
