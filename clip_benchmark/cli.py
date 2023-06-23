@@ -140,10 +140,11 @@ def main_build(base):
 
         # missing information: split, prompt
         # vic_caltech101~val~yfcc15m~RN50-quickgelu~en~zeroshot_classification~none
-        dataset, split, pretrained, model, language, task, template = Path(
+        dataset, split, pretrained, model, language, task, template, transform = Path(
             path).parent.as_posix().split("~")
         row["split"] = split
         row["template"] = template
+        row["transform"] = transform
 
         # load model size from file
         size_file = Path(f"model_sizes/{model}~{pretrained}.json")
@@ -163,7 +164,7 @@ def main_build(base):
     # properly sort field names
     sorted_fieldnames = []
     sort_order = ["language", "task", "dataset", "split", "pretrained", "model", "gigaparams",
-                  "template"]
+                  "template", "transform"]
     for field in sort_order:
         sorted_fieldnames.append(field)
         fieldnames.remove(field)
