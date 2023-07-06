@@ -4,16 +4,14 @@ python multi_eval.py -m "EVA02-E.*" -i
 
 """
 import os
-from pathlib import Path
-from pprint import pprint
+import re
 
 import open_clip
-
 from attr import define
-from typedparser import VerboseQuietArgs, add_argument, TypedParser
-from packg.log import SHORTEST_FORMAT, configure_logger, get_logger_level_from_args
 from loguru import logger
-import re
+from packg.log import SHORTEST_FORMAT, configure_logger, get_logger_level_from_args
+from packg.paths import get_data_dir
+from typedparser import VerboseQuietArgs, add_argument, TypedParser
 
 from clip_benchmark.cli import TARGET_JSON
 
@@ -41,7 +39,7 @@ def main():
     logger.debug(open_clip.pretrained.list_pretrained())
     logger.info(args)
 
-    root = os.environ["CV_DATA_DIR"]
+    root = get_data_dir()
     os.makedirs(root, exist_ok=True)
     datasets = args.datasets.split(",")
     split = args.split

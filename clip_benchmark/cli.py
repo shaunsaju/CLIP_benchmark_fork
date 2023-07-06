@@ -12,6 +12,7 @@ from pprint import pprint
 import joblib
 import torch
 import torchvision
+from packg.paths import get_data_dir
 from torchvision.transforms import InterpolationMode
 
 from clip_benchmark.datasets.builder import build_dataset, get_dataset_collate_fn,\
@@ -21,8 +22,8 @@ from clip_benchmark.metrics import zeroshot_classification, zeroshot_retrieval, 
 from clip_benchmark.model_collection import get_model_collection_from_file, model_collection
 from clip_benchmark.models import load_clip, MODEL_TYPES
 
+TARGET_JSON = "{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}~{template}~{transform}/result.json"
 
-TARGET_JSON="{output_dir}/{debugstr}{dataset}~{split}~{pretrained}~{model}~{language}~{task}~{template}~{transform}/result.json"
 
 def get_parser_args():
     parser = argparse.ArgumentParser()
@@ -277,11 +278,7 @@ def run(args):
 
     dataset_root = args.dataset_root
     if dataset_root is None:
-        if "CV_DATA_DIR" not in os.environ:
-            raise ValueError("Either set envvar CV_DATA_DIR to the root of the dataset folder "
-                             "or pass --dataset_root")
-        dataset_root = (
-                Path(os.environ["CV_DATA_DIR"]) / "clip_benchmark/{dataset_cleaned}").as_posix()
+        dataset_root = (get_data_dir() / "clip_benchmark/{dataset_cleaned}").as_posix()
     dataset_root = dataset_root.format(dataset=dataset_name,
                                        dataset_cleaned=dataset_name.replace("/", "-"))
     print(f"Dataset root: {dataset_root}")

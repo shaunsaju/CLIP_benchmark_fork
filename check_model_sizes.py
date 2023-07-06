@@ -6,7 +6,7 @@ from typing import Dict
 import open_clip
 from attr import define
 from loguru import logger
-from typedattr.logutils import SHORTEST_FORMAT, configure_logger, get_logger_level_from_args
+from packg.log import SHORTEST_FORMAT, configure_logger, get_logger_level_from_args
 from typedparser import VerboseQuietArgs, TypedParser
 
 
@@ -18,7 +18,7 @@ class Args(VerboseQuietArgs):
 def main():
     parser = TypedParser.create_parser(Args, description=__doc__)
     args: Args = parser.parse_args()
-    configure_logger(level=get_logger_level_from_args(args), format=SHORTEST_FORMAT)
+    configure_logger(level=get_logger_level_from_args(args))
 
     output_dir = Path("model_sizes")
     os.makedirs(output_dir, exist_ok=True)
@@ -35,6 +35,7 @@ def main():
         with output_file.open("w", encoding="utf-8") as f:
             json.dump({"params_g": params_g}, f, indent=2)
         del model
+
 
 def count_params(parameters) -> Dict[str, int]:
     # support inputs: model, model.parameters(), model.named_parameters()
