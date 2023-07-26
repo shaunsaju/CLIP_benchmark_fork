@@ -89,13 +89,13 @@ class Pascal3d(VisionDataset):
 
         if self.corruption is not None:
             np_image = np.array(img)
-            corruption = 0
+            corr = 0
             severity = 1
             if self.corruption['corruption'] == "all":
-                corruption = random.randint(0, 15)
+                corr = random.randint(0, 15)
             if self.corruption['severity'] == "all":
                 severity = random.randint(1, 5)
-            img = Image.fromarray(corrupt(np_image, severity, corruption_number=corruption))
+            img = Image.fromarray(corrupt(np_image, severity, corruption_number=corr))
 
         if self.transform is not None:
             img = self.transform(img)
