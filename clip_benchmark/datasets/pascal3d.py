@@ -39,7 +39,7 @@ class Pascal3d(VisionDataset):
         if download:
             self.download()
 
-        artifact_dir = Path(self.root[:self.root.rfind("/")])
+        artifact_dir = Path(self.root)
         image_dir = 'PASCAL3D+_release1.1/Images'
         class_folders = [folder for folder in os.listdir(artifact_dir / image_dir) if '_' in folder]
         class_names = list(set([folder.split('_')[0] for folder in class_folders]))
