@@ -87,10 +87,10 @@ class Pascal3d(VisionDataset):
 
         target = self.targets[index]
 
-        def generate_random_number_except_4():
+        def generate_random_number_except():
             while True:
                 random_number = random.randint(0, 18)
-                if random_number != 4:
+                if random_number not in [4, 16]:
                     return random_number
 
         if self.corruption is not None:
@@ -98,7 +98,7 @@ class Pascal3d(VisionDataset):
             corr = 0
             severity = 1
             if self.corruption['corruption'] == "all":
-                corr = generate_random_number_except_4()
+                corr = generate_random_number_except()
             if self.corruption['severity'] == "all":
                 severity = random.randint(1, 5)
             img = Image.fromarray(corrupt(np_image, severity, corruption_number=corr))
