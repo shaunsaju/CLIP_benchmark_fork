@@ -15,7 +15,7 @@ from torchvision.datasets import (
     MNIST, STL10, EuroSAT, GTSRB, Kitti, Country211, PCAM, RenderedSST2
 )
 
-from . import voc2007, flickr, caltech101, imagenetv2, objectnet, caltech101vic
+from . import voc2007, flickr, caltech101, imagenetv2, objectnet, caltech101vic, pascal3d
 from torch.utils.data import default_collate
 from PIL import Image
 
@@ -381,6 +381,9 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
         ds = caltech101vic.Caltech101Vic(
             root=root, target_type="category", transform=transform, download=download,
             split=split, **kwargs)
+    elif dataset_name == "pascal3d":
+        ds = pascal3d.Pascal3d(root=root, target_type="category", transform=transform, download=False,
+                               split=split, **kwargs)
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}.")
 

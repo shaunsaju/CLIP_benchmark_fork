@@ -61,3 +61,4 @@ probe_benchmark/data
 datasets
 downloads
 .env
+/data/
