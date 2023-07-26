@@ -10,8 +10,10 @@ import requests
 from PIL import Image
 from tqdm import tqdm
 from torchvision.datasets.vision import VisionDataset
-from typing import Any, Callable, List, Optional, Union, Tuple
-
+from typing import Any, Callable, List, Optional, Union, Tuple, Dict
+import numpy as np
+import random
+from imagecorruptions import corrupt
 from torchvision.datasets.utils import (
     download_and_extract_archive, verify_str_arg, download_url)
 
@@ -28,6 +30,8 @@ class Pascal3d(VisionDataset):
             target_transform: Optional[Callable] = None,
             download: bool = False,
             split: str = "train",
+            corruption: Dict = None
+
     ) -> None:
         super().__init__(root, transform=transform,
                          target_transform=target_transform)
@@ -38,7 +42,7 @@ class Pascal3d(VisionDataset):
 
         if download:
             self.download()
-
+        self.corruption = corruption
         artifact_dir = Path(self.root)
         image_dir = 'PASCAL3D+_release1.1/Images'
         class_folders = [folder for folder in os.listdir(artifact_dir / image_dir) if '_' in folder]
@@ -82,6 +86,16 @@ class Pascal3d(VisionDataset):
             os.path.join(self.root, self.imgs[index]))
 
         target = self.targets[index]
+
+        if self.corruption is not None:
+            np_image = np.array(img)
+            corruption = 0
+            severity = 1
+            if self.corruption['corruption'] == "all":
+                corruption = random.randint(0, 15)
+            if self.corruption['severity'] == "all":
+                severity = random.randint(1, 5)
+            img = Image.fromarray(corrupt(np_image, severity, corruption_number=corruption))
 
         if self.transform is not None:
             img = self.transform(img)

@@ -384,6 +384,9 @@ def build_dataset(dataset_name, root="root", transform=None, split="test", downl
     elif dataset_name == "pascal3d":
         ds = pascal3d.Pascal3d(root=root, target_type="category", transform=transform, download=False,
                                split=split, **kwargs)
+    elif dataset_name == 'corr/pascal3d':
+        ds = pascal3d.Pascal3d(root=root, target_type="category", transform=transform, download=False,
+                               split=split, corruption={'corruption': 'all', 'severity': 5}, **kwargs)
     elif dataset_name == "oodcv":
         ds = oodcv.OODCV(root=root, target_type="category", transform=transform, download=False,
                                split=split, **kwargs)
