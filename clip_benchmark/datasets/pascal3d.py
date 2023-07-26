@@ -29,7 +29,7 @@ class Pascal3d(VisionDataset):
             download: bool = False,
             split: str = "train",
     ) -> None:
-        super().__init__(os.path.join(root, "pascal3d"), transform=transform,
+        super().__init__(root, transform=transform,
                          target_transform=target_transform)
         os.makedirs(self.root, exist_ok=True)
         if isinstance(target_type, str):
