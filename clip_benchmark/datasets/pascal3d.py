@@ -95,8 +95,8 @@ class Pascal3d(VisionDataset):
 
         if self.corruption is not None:
             np_image = np.array(img)
-            corr = 0
-            severity = 1
+            corr = self.corruption['corruption']
+            severity = self.corruption['severity']
             if self.corruption['corruption'] == "all":
                 corr = generate_random_number_except()
             if self.corruption['severity'] == "all":
